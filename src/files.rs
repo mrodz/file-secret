@@ -70,7 +70,6 @@ pub fn encrypt_large_file(
     let pb = ProgressBar::new(total_size);
     pb.set_style(ProgressStyle::with_template("{spinner:.green} [{elapsed_precise}] [{bar:.green/.yellow}] {bytes}/{total_bytes} ({eta})")
         .unwrap()
-        // .with_key("eta", |state: &ProgressState, w: &mut dyn Write| write!(w, "{:.1}s", state.eta().as_secs_f64()).unwrap())
         .progress_chars("=>-"));
 
     loop {

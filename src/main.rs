@@ -43,13 +43,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
 
     let action: u8 = ((args.unlock as u8) << 1) | (args.lock as u8);
-    // let with_extension = args.path.to_owned() + ".LOCKED";
-
-    // let defacto_path = if action == 0b10 {
-    //     with_extension.clone()
-    // } else {
-    //     args.path.clone()
-    // };
 
     if !file_exists(&args.path) {
         let mut e = Command::new("any file");
@@ -95,8 +88,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     use std::cmp::min;
     large_file_key[..min(32, password.len())].clone_from_slice(password.as_bytes());
     large_file_nonce[..min(19, password.len())].clone_from_slice(password.as_bytes());
-    // OsRng.fill_bytes(&mut large_file_key);
-    // OsRng.fill_bytes(&mut large_file_nonce);
 
     if let Err(_) = as_fn(
         &args.path,
