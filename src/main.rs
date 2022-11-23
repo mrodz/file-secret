@@ -1,4 +1,3 @@
-mod errors;
 mod files;
 
 extern crate rpassword;
@@ -18,38 +17,51 @@ use indicatif::{ProgressBar, ProgressStyle};
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
-    /// Name of the person to greet
+    /// Specify the path to the file
     #[arg(required(true), index = 1)]
     path: String,
+
+    /// Enter a password to accompany your request. 
+    /// WARNING: if locking a file, will not check input matches your intended password!
     #[arg(short = 'p')]
     password: Option<String>,
+
+    /// Specify that you intend to lock the file. If neither  -l or -u are present, this is the default.
     #[arg(short = 'l', conflicts_with("unlock"))]
     lock: bool,
+
+    /// Specify that you intend to unlock the file.
     #[arg(short = 'u', conflicts_with("lock"))]
     unlock: bool,
+
+    /// Do not replace the original file with the locked, and keep both.
+    #[arg(short = 'P', long = "preserve")]
+    preserve_original: bool,
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
 
     let action: u8 = ((args.unlock as u8) << 1) | (args.lock as u8);
-    let with_extension = args.path.to_owned() + ".LOCKED";
+    // let with_extension = args.path.to_owned() + ".LOCKED";
 
-    let defacto_path = if action == 0b10 {
-        with_extension.clone()
-    } else {
-        args.path.clone()
-    };
+    // let defacto_path = if action == 0b10 {
+    //     with_extension.clone()
+    // } else {
+    //     args.path.clone()
+    // };
 
-    if !file_exists(&defacto_path) {
-        let mut e = Command::new("path");
-        e.error(ErrorKind::ValueValidation, "The file does not exist!")
+    if !file_exists(&args.path) {
+        let mut e = Command::new("any file");
+        e.error(ErrorKind::ValueValidation, "That file does not exist.")
             .exit();
     }
 
-    // let file_content = files::read_file(&args.path).unwrap();
-
-    // encrypt(&file_content, &args.password);
+    if !args.path.ends_with(".LOCKED") && action == 0b10 {
+        let mut e = Command::new("any file with a .LOCKED extension");
+        e.error(ErrorKind::ValueValidation, "Attempting to unlock a file, found wrong file extension. Expected *.LOCKED")
+            .exit();
+    }
 
     // 0b10 if decrypt; 0b00 if encrypt.
 
@@ -58,8 +70,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     } else {
         encrypt_large_file
     };
-
-    let arguments: [&String; 2] = [&args.path, &with_extension];
 
     let mut large_file_key = [0u8; 32];
     let mut large_file_nonce = [0u8; 19];
@@ -88,14 +98,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // OsRng.fill_bytes(&mut large_file_key);
     // OsRng.fill_bytes(&mut large_file_nonce);
 
-    if as_fn(
-        arguments[if action == 0b10 { 1 } else { 0 }],
-        arguments[if action == 0b10 { 0 } else { 1 }],
+    if let Err(_) = as_fn(
+        &args.path,
         &large_file_key,
         &large_file_nonce,
-    ).is_err() {
-        remove_file(arguments[if action == 0b10 { 0 } else { 1 }])?;
-        eprintln!("Incorrect password.");
+    ) {
+        eprintln!("Incorrect password. The resulting file will be filled with garbage.");
         exit(1);
     }
 
@@ -103,13 +111,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let pb = ProgressBar::new(3);
     pb.set_style(ProgressStyle::with_template("{spinner:.green} [{elapsed_precise}] [{bar:.green/.yellow}] {pos}/{len}")
         .unwrap()
-        // .with_key("eta", |state: &ProgressState, w: &mut dyn Write| write!(w, "{:.1}s", state.eta().as_secs_f64()).unwrap())
         .progress_chars("=>-"));
 
     pb.set_position(1);
-    remove_file(&defacto_path)?;
-    pb.set_position(3);
+
+    if !args.preserve_original {
+        remove_file(&args.path)?;
+        pb.set_position(2);
+    }
+
     pb.finish_and_clear();
     println!("Done!");
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::files::yield_file_path;
+
+    #[test]
+    pub fn duplicate() {
+        assert_eq!(yield_file_path(&"test/The Spot6=.png".to_string()), "test/The Spot6= (2).png")
+    }
 }
